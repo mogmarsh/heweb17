@@ -49,8 +49,11 @@ class heweb17 {
 		add_filter( 'woocommerce_add_to_cart_handler', array( $this, 'filter_woocommerce_add_to_cart_handler' ), 10, 2 );
 		add_filter( 'woocommerce_get_cart_url', array( $this, 'filter_woocommerce_get_cart_url' ), 10, 2 );
 		add_filter( 'template_redirect', array( $this, 'cart_redirect' ), 10, 2 );
-		add_action( 'customize_register', array( $this, 'customize_register' ) );
+		add_action('admin_menu', array($this, 'adminMenu'));
+		add_action('admin_init', array($this, 'registerSettings'));
 		add_filter( 'add_to_cart_redirect', array( $this, 'localproduct_add_to_cart_redirect' ) );
+
+		add_action('plugins_loaded', array($this, 'heweb17_init'));
 	}
 
 	/**
@@ -70,8 +73,10 @@ class heweb17 {
 	 * adds the javascript to the front end
 	 */
 	public function add_scripts() {
-		wp_enqueue_script( 'theme-scripts', get_stylesheet_directory_uri() . '/js/heweb17.js', array( 'jquery' ), '0.1' );
-	}
+		wp_enqueue_script(
+			'heweb17',
+			plugins_url( '/js/heweb17.js', __FILE__ ),
+			array( 'jquery' ) );	}
 
 	/**
 	 * adds the javascript to admin
@@ -98,7 +103,10 @@ class heweb17 {
 	public function translate_woocommerce( $translation, $text, $domain ) {
 		if ( $domain == 'woocommerce' ) {
 			switch ( $text ) {
-				case 'SKU':
+				case 'SKU:':
+					$translation = 'ISBN:';
+					break;
+                case 'SKU':
 					$translation = 'ISBN';
 					break;
 
@@ -716,7 +724,7 @@ class heweb17 {
 	 */
 	function filter_woocommerce_add_to_cart_handler( $adding_to_cart_product_type, $adding_to_cart ) {
 
-		$longleafurl = get_theme_mod( 'longleaf' );
+		$longleafurl = get_option('heweb17_longleaf_url');
 		if ( $longleafurl ) {
 			$product_id    = $_POST['add-to-cart'];
 			$local_product = get_post_meta( $product_id, 'local_product', true );
@@ -743,7 +751,7 @@ class heweb17 {
 	 * @return string
 	 */
 	function filter_woocommerce_get_cart_url( $wc_get_page_permalink ) {
-		$longleafurl = get_theme_mod( 'longleaf' );
+		$longleafurl = get_option('heweb17_longleaf_url');
 		if ( $longleafurl && WC()->cart->get_cart_contents_count() == 0 ) {
 			return trailingslashit( $longleafurl );
 		} else {
@@ -776,7 +784,7 @@ class heweb17 {
 	function cart_redirect() {
 		global $post;
 		if ( $post->post_name == 'cart' ) {
-			$longleafurl = get_theme_mod( 'longleaf' );
+			$longleafurl = get_option('heweb17_longleaf_url');
 			if ( $longleafurl && WC()->cart->get_cart_contents_count() == 0 ) {
 				wp_redirect( trailingslashit( $longleafurl ) );
 				exit;
@@ -784,37 +792,7 @@ class heweb17 {
 		}
 	}
 
-	/**
-     * Adds a settings field for the longleaf url
-	 * @param $wp_customize
-	 */
-	public function customize_register( $wp_customize ) {
-		$wp_customize->add_section(
-			'heweb17_settings',
-			array(
-				'title'       => 'HEWeb17 Settings',
-				'description' => 'Settings for HEWeb17.',
-				'priority'    => 5,
-			)
-		);
 
-
-		$wp_customize->add_setting(
-			'longleaf',
-			array(
-				'sanitize_callback' => 'esc_url'
-			)
-		);
-
-		$wp_customize->add_control(
-			'longleaf',
-			array(
-				'type'    => 'text',
-				'label'   => 'Longleaf URL',
-				'section' => 'heweb17_settings',
-			)
-		);
-	}
 
 	/**
      * Sets local products to use regular checkout url
@@ -827,4 +805,60 @@ class heweb17 {
 		return $checkout_url;
 	}
 
+	public function adminMenu()
+	{
+		add_options_page(
+			'HEWeb17',
+			'HEWeb17',
+			'manage_options',
+			'heweb17_options_page_slug',
+			array($this,'page')
+		);
+	}
+
+	public function page()
+	{
+		?>
+        <div class="wrap">
+            <h2>HEWeb17 Demo</h2>
+            <form method="post" action="options.php">
+				<?php
+				settings_fields('heweb17_options');
+				do_settings_sections('heweb17_options');
+
+				$url = esc_attr(
+					get_option('heweb17_longleaf_url')
+				);
+				?>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">LongLeaf URL</th>
+                        <td>
+                            <label for="heweb17_longleaf_url">LongLeaf URL</label>
+                            <input type="text" name="heweb17_longleaf_url" id="heweb17_longleaf_url" value="<?php echo $url;?>" />
+
+
+                        </td>
+                    </tr>
+                </table>
+
+				<?php submit_button(); ?>
+            </form>
+        </div>
+		<?php
+	}
+
+	public function registerSettings()
+	{
+		register_setting(
+			'heweb17_options',
+			'heweb17_longleaf_url'
+		);
+	}
+
+	function myplugin_init() {
+		$plugin_dir = basename(dirname(__FILE__));
+		load_plugin_textdomain( 'my-plugin', false, $plugin_dir );
+	}
 }
